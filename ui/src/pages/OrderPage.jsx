@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useOrder } from '../context/OrderContext';
 import MenuCard from '../components/MenuCard';
 import Cart from '../components/Cart';
 import './OrderPage.css';
@@ -45,6 +46,7 @@ const menuData = [
 
 function OrderPage() {
   const [cartItems, setCartItems] = useState([]);
+  const { addOrder } = useOrder();
 
   const handleAddToCart = (menu, options) => {
     const extraPrice = options.extraShot ? 500 : 0;
@@ -78,6 +80,9 @@ function OrderPage() {
   const handleOrder = () => {
     if (cartItems.length === 0) return;
     
+    // Context를 통해 주문 추가
+    addOrder(cartItems);
+    
     alert('주문이 완료되었습니다!');
     setCartItems([]);
   };
@@ -99,4 +104,3 @@ function OrderPage() {
 }
 
 export default OrderPage;
-
