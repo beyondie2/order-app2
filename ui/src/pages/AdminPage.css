@@ -1,0 +1,14 @@
+.admin-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.admin-page h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.admin-page p {
+  color: #666;
+}
