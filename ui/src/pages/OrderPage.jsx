@@ -6,7 +6,7 @@ import './OrderPage.css';
 
 function OrderPage() {
   const [cartItems, setCartItems] = useState([]);
-  const { menus, addOrder } = useOrder();
+  const { menus, loading, addOrder } = useOrder();
 
   const handleAddToCart = (menu, options) => {
     const extraPrice = options.extraShot ? 500 : 0;
@@ -64,11 +64,11 @@ function OrderPage() {
     setCartItems(newItems);
   };
 
-  const handleOrder = () => {
+  const handleOrder = async () => {
     if (cartItems.length === 0) return;
     
-    // Context를 통해 주문 추가 (재고 확인 포함)
-    const result = addOrder(cartItems);
+    // Context를 통해 주문 추가 (API 호출)
+    const result = await addOrder(cartItems);
     
     alert(result.message);
     
@@ -76,6 +76,14 @@ function OrderPage() {
       setCartItems([]);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="order-page">
+        <p>메뉴를 불러오는 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="order-page">

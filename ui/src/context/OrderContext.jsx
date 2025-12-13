@@ -1,151 +1,143 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { menuApi, optionApi, orderApi } from '../api';
 
 const OrderContext = createContext();
 
-// 메뉴 데이터 (재고 포함)
-const initialMenuData = [
-  {
-    id: 1,
-    name: '아메리카노(ICE)',
-    price: 4000,
-    description: '깔끔하고 진한 에스프레소와 시원한 얼음의 조화',
-    stock: 10
-  },
-  {
-    id: 2,
-    name: '아메리카노(HOT)',
-    price: 4000,
-    description: '깊고 풍부한 향의 따뜻한 아메리카노',
-    stock: 10
-  },
-  {
-    id: 3,
-    name: '카페라떼',
-    price: 5000,
-    description: '부드러운 우유와 에스프레소의 완벽한 조화',
-    stock: 10
-  },
-  {
-    id: 4,
-    name: '바닐라라떼',
-    price: 5500,
-    description: '달콤한 바닐라 시럽이 더해진 부드러운 라떼',
-    stock: 10
-  },
-  {
-    id: 5,
-    name: '카푸치노',
-    price: 5000,
-    description: '풍성한 우유 거품과 에스프레소의 클래식한 맛',
-    stock: 10
-  },
-  {
-    id: 6,
-    name: '카라멜마키아또',
-    price: 5500,
-    description: '달콤한 카라멜과 부드러운 우유의 환상적인 조합',
-    stock: 10
-  }
-];
-
 export function OrderProvider({ children }) {
-  const [menus, setMenus] = useState(initialMenuData);
+  const [menus, setMenus] = useState([]);
+  const [options, setOptions] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [nextOrderId, setNextOrderId] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // 재고 확인
-  const checkStock = (menuId, quantity) => {
-    const menu = menus.find(m => m.id === menuId);
-    return menu ? menu.stock >= quantity : false;
-  };
-
-  // 새 주문 추가 (재고 차감 포함)
-  const addOrder = (cartItems) => {
-    // 재고 확인
-    for (const item of cartItems) {
-      if (!checkStock(item.id, item.quantity)) {
-        return { success: false, message: `${item.name}의 재고가 부족합니다.` };
-      }
+  // 메뉴 목록 조회
+  const fetchMenus = useCallback(async () => {
+    try {
+      const response = await menuApi.getAll();
+      setMenus(response.data);
+    } catch (err) {
+      console.error('메뉴 조회 실패:', err);
+      setError(err.message);
     }
+  }, []);
 
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
+  // 옵션 목록 조회
+  const fetchOptions = useCallback(async () => {
+    try {
+      const response = await optionApi.getAll();
+      setOptions(response.data);
+    } catch (err) {
+      console.error('옵션 조회 실패:', err);
+    }
+  }, []);
 
-    const newOrders = cartItems.map((item, index) => ({
-      id: nextOrderId + index,
-      date: `${month}월 ${day}일`,
-      time: `${hours}:${minutes}`,
-      menu: item.name + (item.options.extraShot ? ' (샷 추가)' : '') + (item.options.syrup ? ' (시럽 추가)' : ''),
-      menuId: item.id,
-      quantity: item.quantity,
-      price: item.totalPrice * item.quantity,
-      status: '주문 접수'
-    }));
+  // 주문 목록 조회
+  const fetchOrders = useCallback(async () => {
+    try {
+      const response = await orderApi.getAll();
+      setOrders(response.data);
+    } catch (err) {
+      console.error('주문 조회 실패:', err);
+    }
+  }, []);
 
-    // 재고 차감
-    setMenus(prev => 
-      prev.map(menu => {
-        const orderedItem = cartItems.find(item => item.id === menu.id);
-        if (orderedItem) {
-          return { ...menu, stock: menu.stock - orderedItem.quantity };
-        }
-        return menu;
-      })
-    );
+  // 초기 데이터 로드
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchMenus(), fetchOptions(), fetchOrders()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [fetchMenus, fetchOptions, fetchOrders]);
 
-    setOrders(prev => [...prev, ...newOrders]);
-    setNextOrderId(prev => prev + cartItems.length);
+  // 새 주문 추가
+  const addOrder = async (cartItems) => {
+    try {
+      const items = cartItems.map(item => ({
+        menu_id: item.id,
+        quantity: item.quantity,
+        options: item.options.extraShot || item.options.syrup ? [
+          ...(item.options.extraShot ? [{ id: 1, name: '샷 추가', price: 500 }] : []),
+          ...(item.options.syrup ? [{ id: 2, name: '시럽 추가', price: 0 }] : []),
+        ] : []
+      }));
 
-    return { success: true, message: '주문이 완료되었습니다!' };
+      await orderApi.create(items);
+      
+      // 데이터 새로고침
+      await Promise.all([fetchMenus(), fetchOrders()]);
+      
+      return { success: true, message: '주문이 완료되었습니다!' };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
   };
 
   // 주문 상태 변경
-  const updateOrderStatus = (orderId) => {
-    setOrders(prev => 
-      prev.map(order => {
-        if (order.id !== orderId) return order;
-        
-        if (order.status === '주문 접수') {
-          return { ...order, status: '제조 중' };
-        } else if (order.status === '제조 중') {
-          return { ...order, status: '제조 완료' };
-        }
-        return order;
-      })
-    );
+  const updateOrderStatus = async (orderId, currentStatus) => {
+    try {
+      let newStatus;
+      if (currentStatus === '주문 접수') {
+        newStatus = '제조 중';
+      } else if (currentStatus === '제조 중') {
+        newStatus = '제조 완료';
+      } else {
+        return;
+      }
+
+      await orderApi.updateStatus(orderId, newStatus);
+      await fetchOrders();
+    } catch (err) {
+      console.error('주문 상태 변경 실패:', err);
+      alert(err.message);
+    }
   };
 
   // 재고 증가
-  const increaseStock = (id) => {
-    setMenus(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, stock: item.stock + 1 } : item
-      )
-    );
+  const increaseStock = async (id) => {
+    try {
+      const menu = menus.find(m => m.id === id);
+      if (menu) {
+        await menuApi.updateStock(id, menu.stock + 1);
+        await fetchMenus();
+      }
+    } catch (err) {
+      console.error('재고 증가 실패:', err);
+      alert(err.message);
+    }
   };
 
   // 재고 감소
-  const decreaseStock = (id) => {
-    setMenus(prev => 
-      prev.map(item => 
-        item.id === id && item.stock > 0 
-          ? { ...item, stock: item.stock - 1 } 
-          : item
-      )
-    );
+  const decreaseStock = async (id) => {
+    try {
+      const menu = menus.find(m => m.id === id);
+      if (menu && menu.stock > 0) {
+        await menuApi.updateStock(id, menu.stock - 1);
+        await fetchMenus();
+      }
+    } catch (err) {
+      console.error('재고 감소 실패:', err);
+      alert(err.message);
+    }
+  };
+
+  // 데이터 새로고침
+  const refreshData = async () => {
+    await Promise.all([fetchMenus(), fetchOptions(), fetchOrders()]);
   };
 
   const value = {
     menus,
+    options,
     orders,
+    loading,
+    error,
     addOrder,
     updateOrderStatus,
     increaseStock,
     decreaseStock,
-    checkStock
+    refreshData
   };
 
   return (

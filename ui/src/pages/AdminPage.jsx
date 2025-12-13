@@ -5,6 +5,7 @@ function AdminPage() {
   const { 
     menus,
     orders, 
+    loading,
     updateOrderStatus, 
     increaseStock, 
     decreaseStock 
@@ -34,6 +35,50 @@ function AdminPage() {
       default: return status;
     }
   };
+
+  // 주문 상태 변경 핸들러
+  const handleStatusChange = (orderId, currentStatus) => {
+    updateOrderStatus(orderId, currentStatus);
+  };
+
+  // 주문 항목 표시 텍스트
+  const getOrderItemsText = (order) => {
+    if (order.items && order.items.length > 0) {
+      return order.items
+        .filter(item => item.menu_name)
+        .map(item => {
+          const optionsText = item.options && item.options.length > 0 
+            ? ` (${item.options.map(o => o.name).join(', ')})` 
+            : '';
+          return `${item.menu_name}${optionsText} x ${item.quantity}`;
+        })
+        .join(', ');
+    }
+    return '주문 항목 없음';
+  };
+
+  // 주문 총 금액
+  const getOrderTotalPrice = (order) => {
+    return order.total_price || 0;
+  };
+
+  // 주문 날짜/시간 포맷
+  const formatDateTime = (dateString) => {
+    const date = new Date(dateString);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${month}월 ${day}일 ${hours}:${minutes}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="admin-page">
+        <p>로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-page">
@@ -96,12 +141,12 @@ function AdminPage() {
           ) : (
             orders.map(order => (
               <div key={order.id} className="order-item">
-                <span className="order-datetime">{order.date} {order.time}</span>
-                <span className="order-menu">{order.menu} x {order.quantity}</span>
-                <span className="order-price">{order.price.toLocaleString()}원</span>
+                <span className="order-datetime">{formatDateTime(order.created_at)}</span>
+                <span className="order-menu">{getOrderItemsText(order)}</span>
+                <span className="order-price">{getOrderTotalPrice(order).toLocaleString()}원</span>
                 <button 
                   className={`order-status-btn ${order.status === '제조 완료' ? 'completed' : ''}`}
-                  onClick={() => updateOrderStatus(order.id)}
+                  onClick={() => handleStatusChange(order.id, order.status)}
                   disabled={order.status === '제조 완료'}
                 >
                   {getButtonText(order.status)}
