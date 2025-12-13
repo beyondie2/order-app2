@@ -3,8 +3,8 @@ import './AdminPage.css';
 
 function AdminPage() {
   const { 
+    menus,
     orders, 
-    inventory, 
     updateOrderStatus, 
     increaseStock, 
     decreaseStock 
@@ -55,7 +55,7 @@ function AdminPage() {
       <section className="inventory-section">
         <h2 className="section-title">재고 현황</h2>
         <div className="inventory-grid">
-          {inventory.map(item => {
+          {menus.map(item => {
             const status = getStockStatus(item.stock);
             return (
               <div key={item.id} className="inventory-card">

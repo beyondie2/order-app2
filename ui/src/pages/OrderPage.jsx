@@ -4,49 +4,9 @@ import MenuCard from '../components/MenuCard';
 import Cart from '../components/Cart';
 import './OrderPage.css';
 
-// 커피 메뉴 데이터
-const menuData = [
-  {
-    id: 1,
-    name: '아메리카노(ICE)',
-    price: 4000,
-    description: '깔끔하고 진한 에스프레소와 시원한 얼음의 조화'
-  },
-  {
-    id: 2,
-    name: '아메리카노(HOT)',
-    price: 4000,
-    description: '깊고 풍부한 향의 따뜻한 아메리카노'
-  },
-  {
-    id: 3,
-    name: '카페라떼',
-    price: 5000,
-    description: '부드러운 우유와 에스프레소의 완벽한 조화'
-  },
-  {
-    id: 4,
-    name: '바닐라라떼',
-    price: 5500,
-    description: '달콤한 바닐라 시럽이 더해진 부드러운 라떼'
-  },
-  {
-    id: 5,
-    name: '카푸치노',
-    price: 5000,
-    description: '풍성한 우유 거품과 에스프레소의 클래식한 맛'
-  },
-  {
-    id: 6,
-    name: '카라멜마키아또',
-    price: 5500,
-    description: '달콤한 카라멜과 부드러운 우유의 환상적인 조합'
-  }
-];
-
 function OrderPage() {
   const [cartItems, setCartItems] = useState([]);
-  const { addOrder } = useOrder();
+  const { menus, addOrder } = useOrder();
 
   const handleAddToCart = (menu, options) => {
     const extraPrice = options.extraShot ? 500 : 0;
@@ -77,20 +37,50 @@ function OrderPage() {
     }
   };
 
+  // 장바구니 아이템 수량 증가
+  const handleIncreaseQuantity = (index) => {
+    const newItems = [...cartItems];
+    newItems[index].quantity += 1;
+    setCartItems(newItems);
+  };
+
+  // 장바구니 아이템 수량 감소
+  const handleDecreaseQuantity = (index) => {
+    const newItems = [...cartItems];
+    if (newItems[index].quantity > 1) {
+      newItems[index].quantity -= 1;
+      setCartItems(newItems);
+    } else {
+      // 수량이 1이면 아이템 삭제
+      newItems.splice(index, 1);
+      setCartItems(newItems);
+    }
+  };
+
+  // 장바구니 아이템 삭제
+  const handleRemoveItem = (index) => {
+    const newItems = [...cartItems];
+    newItems.splice(index, 1);
+    setCartItems(newItems);
+  };
+
   const handleOrder = () => {
     if (cartItems.length === 0) return;
     
-    // Context를 통해 주문 추가
-    addOrder(cartItems);
+    // Context를 통해 주문 추가 (재고 확인 포함)
+    const result = addOrder(cartItems);
     
-    alert('주문이 완료되었습니다!');
-    setCartItems([]);
+    alert(result.message);
+    
+    if (result.success) {
+      setCartItems([]);
+    }
   };
 
   return (
     <div className="order-page">
       <div className="menu-grid">
-        {menuData.map(menu => (
+        {menus.map(menu => (
           <MenuCard 
             key={menu.id} 
             menu={menu} 
@@ -98,7 +88,13 @@ function OrderPage() {
           />
         ))}
       </div>
-      <Cart items={cartItems} onOrder={handleOrder} />
+      <Cart 
+        items={cartItems} 
+        onOrder={handleOrder}
+        onIncreaseQuantity={handleIncreaseQuantity}
+        onDecreaseQuantity={handleDecreaseQuantity}
+        onRemoveItem={handleRemoveItem}
+      />
     </div>
   );
 }

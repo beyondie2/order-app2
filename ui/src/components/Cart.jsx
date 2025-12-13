@@ -1,6 +1,6 @@
 import './Cart.css';
 
-function Cart({ items, onOrder }) {
+function Cart({ items, onOrder, onIncreaseQuantity, onDecreaseQuantity, onRemoveItem }) {
   const totalPrice = items.reduce((sum, item) => sum + item.totalPrice * item.quantity, 0);
 
   return (
@@ -19,8 +19,29 @@ function Cart({ items, onOrder }) {
                     {item.options.extraShot && ' (샷 추가)'}
                     {item.options.syrup && ' (시럽 추가)'}
                   </span>
-                  <span className="item-quantity">X {item.quantity}</span>
+                  <div className="item-quantity-control">
+                    <button 
+                      className="qty-btn"
+                      onClick={() => onDecreaseQuantity(index)}
+                    >
+                      -
+                    </button>
+                    <span className="item-quantity">{item.quantity}</span>
+                    <button 
+                      className="qty-btn"
+                      onClick={() => onIncreaseQuantity(index)}
+                    >
+                      +
+                    </button>
+                  </div>
                   <span className="item-price">{(item.totalPrice * item.quantity).toLocaleString()}원</span>
+                  <button 
+                    className="remove-btn"
+                    onClick={() => onRemoveItem(index)}
+                    title="삭제"
+                  >
+                    ✕
+                  </button>
                 </div>
               ))
             )}
