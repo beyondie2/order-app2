@@ -210,3 +210,314 @@
 | 주문 일시 | 메뉴 | 금액 | 상태 |
 |-----------|------|------|------|
 | 7월 31일 13:00 | 아메리카노(ICE) x 1 | 4,000원 | 주문 접수 |
+
+---
+
+## 5. 백엔드 정의서
+
+### 5.1 데이터 모델
+
+#### 5.1.1 Menus (메뉴)
+| 필드명 | 타입 | 설명 | 제약조건 |
+|--------|------|------|----------|
+| id | INTEGER | 메뉴 고유 ID | PK, Auto Increment |
+| name | VARCHAR(100) | 커피 이름 | NOT NULL |
+| description | TEXT | 메뉴 설명 | |
+| price | INTEGER | 가격 (원) | NOT NULL, >= 0 |
+| image_url | VARCHAR(255) | 이미지 URL | |
+| stock | INTEGER | 재고 수량 | NOT NULL, DEFAULT 0, >= 0 |
+| created_at | TIMESTAMP | 생성 일시 | DEFAULT CURRENT_TIMESTAMP |
+| updated_at | TIMESTAMP | 수정 일시 | DEFAULT CURRENT_TIMESTAMP |
+
+#### 5.1.2 Options (옵션)
+| 필드명 | 타입 | 설명 | 제약조건 |
+|--------|------|------|----------|
+| id | INTEGER | 옵션 고유 ID | PK, Auto Increment |
+| name | VARCHAR(100) | 옵션 이름 | NOT NULL |
+| price | INTEGER | 옵션 추가 가격 (원) | NOT NULL, DEFAULT 0 |
+| menu_id | INTEGER | 연결할 메뉴 ID | FK → Menus.id, NULL 허용 (전체 메뉴 적용 시) |
+| created_at | TIMESTAMP | 생성 일시 | DEFAULT CURRENT_TIMESTAMP |
+
+#### 5.1.3 Orders (주문)
+| 필드명 | 타입 | 설명 | 제약조건 |
+|--------|------|------|----------|
+| id | INTEGER | 주문 고유 ID | PK, Auto Increment |
+| total_price | INTEGER | 총 주문 금액 | NOT NULL |
+| status | VARCHAR(20) | 주문 상태 | NOT NULL, DEFAULT '주문 접수' |
+| created_at | TIMESTAMP | 주문 일시 | DEFAULT CURRENT_TIMESTAMP |
+| updated_at | TIMESTAMP | 수정 일시 | DEFAULT CURRENT_TIMESTAMP |
+
+#### 5.1.4 OrderItems (주문 상세)
+| 필드명 | 타입 | 설명 | 제약조건 |
+|--------|------|------|----------|
+| id | INTEGER | 주문 상세 고유 ID | PK, Auto Increment |
+| order_id | INTEGER | 주문 ID | FK → Orders.id, NOT NULL |
+| menu_id | INTEGER | 메뉴 ID | FK → Menus.id, NOT NULL |
+| menu_name | VARCHAR(100) | 주문 시점 메뉴명 | NOT NULL |
+| quantity | INTEGER | 수량 | NOT NULL, >= 1 |
+| unit_price | INTEGER | 단가 (옵션 포함) | NOT NULL |
+| options | JSON | 선택된 옵션 정보 | |
+
+### 5.2 데이터 스키마를 위한 사용자 흐름
+
+#### 흐름 1: 메뉴 조회
+```
+[사용자] → '주문하기' 클릭 → [프런트엔드] → GET /api/menus → [백엔드] → SELECT * FROM Menus → [DB]
+                                    ↓
+[사용자] ← 메뉴 목록 표시 ← [프런트엔드] ← 메뉴 데이터 반환 ← [백엔드] ← 메뉴 데이터 ← [DB]
+```
+- Menus 테이블에서 메뉴 정보를 가져와 브라우저 화면에 표시
+- 재고 수량(stock)은 관리자 화면에서만 표시
+
+#### 흐름 2: 장바구니 담기
+```
+[사용자] → 메뉴 선택 + 옵션 선택 + '담기' 클릭 → [프런트엔드 상태 관리]
+```
+- 선택 정보는 프런트엔드 상태(Context)에서 관리
+- 장바구니에 메뉴명, 옵션, 수량, 금액 표시
+
+#### 흐름 3: 주문 생성
+```
+[사용자] → '주문하기' 클릭 → [프런트엔드] → POST /api/orders → [백엔드] → INSERT INTO Orders, OrderItems → [DB]
+                                                                    ↓
+                                                        UPDATE Menus SET stock = stock - quantity
+```
+- 장바구니 정보를 Orders 및 OrderItems 테이블에 저장
+- 주문 시간, 메뉴, 수량, 옵션, 금액 저장
+- 해당 메뉴의 재고 수량 차감
+
+#### 흐름 4: 주문 현황 표시 (관리자)
+```
+[관리자] → '관리자' 클릭 → [프런트엔드] → GET /api/orders → [백엔드] → SELECT * FROM Orders, OrderItems → [DB]
+                                    ↓
+[관리자] ← 주문 목록 표시 ← [프런트엔드] ← 주문 데이터 반환 ← [백엔드] ← 주문 데이터 ← [DB]
+```
+- Orders 테이블의 정보를 관리자 화면의 '주문 현황'에 표시
+- 기본 상태: '주문 접수'
+
+#### 흐름 5: 주문 상태 변경
+```
+[관리자] → 상태 버튼 클릭 → [프런트엔드] → PATCH /api/orders/:id → [백엔드] → UPDATE Orders SET status → [DB]
+```
+- '주문 접수' → '제조 중' → '제조 완료' 순서로 상태 변경
+
+### 5.3 API 설계
+
+#### 5.3.1 메뉴 API
+
+##### 메뉴 목록 조회
+```
+GET /api/menus
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 모든 커피 메뉴 목록을 조회합니다 |
+| 요청 | 없음 |
+| 응답 | 200 OK |
+
+**응답 예시**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "아메리카노(ICE)",
+      "description": "깔끔하고 진한 에스프레소와 시원한 얼음의 조화",
+      "price": 4000,
+      "image_url": "/images/americano-ice.jpg",
+      "stock": 10
+    }
+  ]
+}
+```
+
+##### 메뉴 상세 조회
+```
+GET /api/menus/:id
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 특정 메뉴의 상세 정보를 조회합니다 |
+| 파라미터 | id: 메뉴 ID |
+| 응답 | 200 OK / 404 Not Found |
+
+##### 메뉴 재고 수정
+```
+PATCH /api/menus/:id/stock
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 메뉴의 재고 수량을 수정합니다 |
+| 파라미터 | id: 메뉴 ID |
+| 요청 본문 | { "stock": 15 } |
+| 응답 | 200 OK / 404 Not Found |
+
+#### 5.3.2 옵션 API
+
+##### 옵션 목록 조회
+```
+GET /api/options
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 모든 옵션 목록을 조회합니다 |
+| 쿼리 | menu_id: 특정 메뉴의 옵션만 조회 (선택) |
+| 응답 | 200 OK |
+
+**응답 예시**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "샷 추가",
+      "price": 500,
+      "menu_id": null
+    },
+    {
+      "id": 2,
+      "name": "시럽 추가",
+      "price": 0,
+      "menu_id": null
+    }
+  ]
+}
+```
+
+#### 5.3.3 주문 API
+
+##### 주문 생성
+```
+POST /api/orders
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 새로운 주문을 생성하고 재고를 차감합니다 |
+| 응답 | 201 Created / 400 Bad Request (재고 부족) |
+
+**요청 예시**
+```json
+{
+  "items": [
+    {
+      "menu_id": 1,
+      "quantity": 2,
+      "options": [
+        { "id": 1, "name": "샷 추가", "price": 500 }
+      ]
+    }
+  ]
+}
+```
+
+**응답 예시**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "total_price": 9000,
+    "status": "주문 접수",
+    "created_at": "2024-07-31T13:00:00Z",
+    "items": [
+      {
+        "menu_name": "아메리카노(ICE)",
+        "quantity": 2,
+        "unit_price": 4500,
+        "options": [{ "name": "샷 추가", "price": 500 }]
+      }
+    ]
+  }
+}
+```
+
+##### 주문 목록 조회
+```
+GET /api/orders
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 모든 주문 목록을 조회합니다 |
+| 쿼리 | status: 특정 상태의 주문만 조회 (선택) |
+| 응답 | 200 OK |
+
+##### 주문 상세 조회
+```
+GET /api/orders/:id
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 특정 주문의 상세 정보를 조회합니다 |
+| 파라미터 | id: 주문 ID |
+| 응답 | 200 OK / 404 Not Found |
+
+**응답 예시**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "total_price": 9000,
+    "status": "주문 접수",
+    "created_at": "2024-07-31T13:00:00Z",
+    "items": [
+      {
+        "menu_name": "아메리카노(ICE)",
+        "quantity": 2,
+        "unit_price": 4500,
+        "options": [{ "name": "샷 추가", "price": 500 }]
+      }
+    ]
+  }
+}
+```
+
+##### 주문 상태 변경
+```
+PATCH /api/orders/:id/status
+```
+| 항목 | 내용 |
+|------|------|
+| 설명 | 주문 상태를 다음 단계로 변경합니다 |
+| 파라미터 | id: 주문 ID |
+| 요청 본문 | { "status": "제조 중" } |
+| 응답 | 200 OK / 400 Bad Request / 404 Not Found |
+
+**상태 변경 규칙**
+| 현재 상태 | 변경 가능한 상태 |
+|-----------|-----------------|
+| 주문 접수 | 제조 중 |
+| 제조 중 | 제조 완료 |
+| 제조 완료 | (변경 불가) |
+
+### 5.4 API 응답 형식
+
+#### 성공 응답
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+#### 에러 응답
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INSUFFICIENT_STOCK",
+    "message": "재고가 부족합니다."
+  }
+}
+```
+
+#### 에러 코드
+| 코드 | HTTP 상태 | 설명 |
+|------|-----------|------|
+| NOT_FOUND | 404 | 리소스를 찾을 수 없음 |
+| INVALID_REQUEST | 400 | 잘못된 요청 |
+| INSUFFICIENT_STOCK | 400 | 재고 부족 |
+| INVALID_STATUS | 400 | 잘못된 상태 변경 |
+| SERVER_ERROR | 500 | 서버 내부 오류 |
