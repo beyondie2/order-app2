@@ -32,9 +32,17 @@ function MenuCard({ menu, onAddToCart }) {
   return (
     <div className={`menu-card ${isSoldOut ? 'sold-out' : ''}`}>
       <div className="menu-image">
-        <div className="placeholder-image">
-          <div className="placeholder-x"></div>
-        </div>
+        {menu.image_url ? (
+          <img 
+            src={menu.image_url} 
+            alt={menu.name} 
+            className="menu-img"
+          />
+        ) : (
+          <div className="placeholder-image">
+            <div className="placeholder-x"></div>
+          </div>
+        )}
         {isSoldOut && <div className="sold-out-badge">품절</div>}
         {isLowStock && <div className="low-stock-badge">재고 {menu.stock}개</div>}
       </div>
