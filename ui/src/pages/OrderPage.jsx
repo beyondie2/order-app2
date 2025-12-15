@@ -6,7 +6,7 @@ import './OrderPage.css';
 
 function OrderPage() {
   const [cartItems, setCartItems] = useState([]);
-  const { menus, loading, addOrder } = useOrder();
+  const { menus, loading, error, addOrder } = useOrder();
 
   const handleAddToCart = (menu, options) => {
     const extraPrice = options.extraShot ? 500 : 0;
@@ -85,8 +85,19 @@ function OrderPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="order-page">
+        <p style={{color: 'red'}}>❌ 에러: {error}</p>
+        <p>API URL: {import.meta.env.VITE_API_URL || '/api (기본값)'}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="order-page">
+      {/* 디버깅: 메뉴 개수 표시 */}
+      <p style={{fontSize: '12px', color: '#666'}}>📋 메뉴 {menus.length}개 로드됨 | API: {import.meta.env.VITE_API_URL || '/api'}</p>
       <div className="menu-grid">
         {menus.map(menu => (
           <MenuCard 

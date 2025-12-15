@@ -1,8 +1,13 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+// 디버깅: API URL 확인
+console.log('🔍 VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('🔍 API_BASE_URL:', API_BASE_URL);
+
 // 공통 fetch 함수
 async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  console.log('🌐 Fetching:', url);
   
   const defaultOptions = {
     headers: {
